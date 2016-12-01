@@ -11,6 +11,20 @@ local PERSON_IMAGES = {
     love.graphics.newImage('assets/person4.png')
 }
 local PERSON_SCALE = 1/8
+local SIGN_LEFT = {
+    love.graphics.newImage('assets/left0.jpg'),
+    love.graphics.newImage('assets/left1.jpg'),
+    love.graphics.newImage('assets/left2.jpg'),
+    love.graphics.newImage('assets/left3.jpg'),
+    love.graphics.newImage('assets/left4.jpg')
+}
+local SIGN_RIGHT = {
+    love.graphics.newImage('assets/right0.jpg'),
+    love.graphics.newImage('assets/right1.jpg'),
+    love.graphics.newImage('assets/right2.jpg'),
+    love.graphics.newImage('assets/right3.jpg'),
+    love.graphics.newImage('assets/right4.jpg')
+}
 
 local MERRIWEATHER = 'assets/Merriweather/Merriweather-Regular.ttf'
 local ROBOTO = 'assets/Roboto/Roboto-Regular.ttf'
@@ -47,6 +61,15 @@ local ROOM_DOOR_COORDS = {
     {{490, 473}            }  -- UA2240
 }
 
+local SIGN_COORDS = {
+    {904,260},
+    {704,260},
+    {505,260},
+    {895,405},
+    {707,405},
+    {508,405}
+}
+
 local TOP_HALL, BOTTOM_HALL = 1, 2
 local LEFT_CORNER, RIGHT_CORNER = 1, 2
 
@@ -81,7 +104,8 @@ local PHASE_DEAD = 5
 local SAMPLE_RATE = 4
 local GRAPH_BG_COLOR = {100, 100, 100}
 local GRAPH_LABEL_COLOR = {255, 255, 255}
-local MIN_SPEED = 0.2
+local MIN_SPEED = 0.15
+local SIGN_FRAME_RATE = 12
 
 --[[
     Variables
@@ -96,6 +120,8 @@ local numberOfPeopleData = {}
 local averageWaitData = {}
 local stairImbalanceData = {}
 local sampleCount = 0
+local signFrame = 1
+local nextFrameCount = 0
 
 local guidanceSystemChoices = {
     STAIR_RIGHT, STAIR_LEFT, STAIR_LEFT, STAIR_RIGHT, STAIR_RIGHT, STAIR_LEFT
@@ -289,7 +315,7 @@ function printRight(font, text, x, y)
     love.graphics.print(text, x - font:getWidth(text), y)
 end
 
-function graph(dataSet, x, y, w, h, expectedMax)
+function graph(dataSet, x, y, w, h, expectedMax, betterHigh)
     love.graphics.push('all')
     love.graphics.setColor(GRAPH_BG_COLOR[1], GRAPH_BG_COLOR[2], GRAPH_BG_COLOR[3])
     love.graphics.rectangle("fill", x, y, w, h)
@@ -305,7 +331,11 @@ function graph(dataSet, x, y, w, h, expectedMax)
     local barWidth = w / #dataSet
     for i, data in ipairs(dataSet) do
         local amount = data / max
-        love.graphics.setColor(amount * 200, 255 - amount * 200, 20)
+        if betterHigh then
+            love.graphics.setColor(255 - amount * 200, amount * 200, 20)
+        else
+            love.graphics.setColor(amount * 200, 255 - amount * 200, 20)
+        end
         love.graphics.rectangle("fill", x + w - i*barWidth, y + h - amount*h, barWidth, amount*h)
     end
 
@@ -366,7 +396,16 @@ function love.draw()
             table.remove(stairImbalanceData)
         end
 
-        local averageWait = math.floor((math.pow(math.max(0, rightStairCount-20), 3) + math.pow(math.max(0, leftStairCount-20), 3)) / (rightStairCount + leftStairCount) / 10)
+        local leftStairSpeed, rightStairSpeed = 1, 1
+        if leftStairCount > 20 then
+            leftStairSpeed = math.max(MIN_SPEED, 1 - math.pow(leftStairCount-20, 2)/400)
+        end
+        if rightStairCount > 20 then
+            rightStairSpeed = math.max(MIN_SPEED, 1 - math.pow(rightStairCount-20, 2)/400)
+        end
+
+        --local averageWait = math.floor((math.pow(math.max(0, rightStairCount-20), 3) + math.pow(math.max(0, leftStairCount-20), 3)) / (rightStairCount + leftStairCount) / 10)
+        local averageWait = (leftStairCount * leftStairSpeed + rightStairCount * rightStairSpeed) / (leftStairCount + rightStairCount) * 100
 
         table.insert(averageWaitData, 1, averageWait)
         if #averageWaitData > 20 then
@@ -385,10 +424,24 @@ function love.draw()
         love.graphics.setFont(TITLE_FONT)
         love.graphics.print('2016', TITLE_FONT:getWidth('Evacuation Simulator ') + 30, 20)
 
-        love.graphics.setFont(LABEL_FONT)
-        love.graphics.setColor(0, 0, 0)
-        for i, choice in ipairs(guidanceSystemChoices) do
-            love.graphics.print(choice == 1 and 'left' or 'right', 600 + i*50, 20)
+        if guidanceCheckbox.checked then
+            nextFrameCount = nextFrameCount + 1
+            if nextFrameCount >= SIGN_FRAME_RATE then
+                signFrame = signFrame + 1
+                if signFrame > 5 then
+                    signFrame = 1
+                end
+                nextFrameCount = 0
+            end
+            love.graphics.setColor(255, 255, 255)
+            for i, choice in ipairs(guidanceSystemChoices) do
+                local frames = choice == 1 and SIGN_LEFT or SIGN_RIGHT
+                love.graphics.push()
+                love.graphics.translate(SIGN_COORDS[i][X], SIGN_COORDS[i][Y])
+                love.graphics.scale(0.25, 0.25)
+                love.graphics.draw(frames[signFrame], -160, -70)
+                love.graphics.pop()
+            end
         end
 
         love.graphics.setColor(10, 10, 10)
@@ -410,8 +463,8 @@ function love.draw()
 
         love.graphics.setColor(255, 255, 255)
         love.graphics.setFont(LABEL_FONT)
-        love.graphics.print('Average wait:', 1100, 720-160+15)
-        graph(averageWaitData, 1100, 720-160+15+30, 130, 100, 100)
+        love.graphics.print('Average speed:', 1100, 720-160+15)
+        graph(averageWaitData, 1100, 720-160+15+30, 130, 100, 100, true)
     end
     love.graphics.pop()
 
@@ -432,4 +485,10 @@ end
 function love.keypressed(key)
     -- forward keypresses to SUIT
     suit.keypressed(key)
+
+    if key == "r" then
+        for i, person in ipairs(people) do
+            person.alive = false
+        end
+    end
 end
