@@ -16,7 +16,7 @@ local MERRIWEATHER = 'assets/Merriweather/Merriweather-Regular.ttf'
 local ROBOTO = 'assets/Roboto/Roboto-Regular.ttf'
 local OSWALD = 'assets/Oswald/Oswald-Regular.ttf'
 
-local TITLE_FONT = love.graphics.newFont(MERRIWEATHER, 42)
+local TITLE_FONT = love.graphics.newFont(OSWALD, 42)
 local CONTROL_PANEL_FONT = love.graphics.newFont(MERRIWEATHER, 20)
 local LABEL_FONT = love.graphics.newFont(MERRIWEATHER, 16)
 local DATA_FONT = love.graphics.newFont(ROBOTO, 16)
@@ -81,6 +81,7 @@ local PHASE_DEAD = 5
 local SAMPLE_RATE = 4
 local GRAPH_BG_COLOR = {100, 100, 100}
 local GRAPH_LABEL_COLOR = {255, 255, 255}
+local MIN_SPEED = 0.2
 
 --[[
     Variables
@@ -88,7 +89,7 @@ local GRAPH_LABEL_COLOR = {255, 255, 255}
 local people = {}
 local spawnTimer = 0
 local spawnRateSlider = { value = 5, min = 0.1, max = 15 }
-local stairwayBiasSlider = { value = 0.5, min = 0, max = 1 }
+local stairwayBiasSlider = { value = 0.9, min = 0, max = 1 }
 local guidanceCheckbox = { checked = false }
 
 local numberOfPeopleData = {}
@@ -97,7 +98,7 @@ local stairImbalanceData = {}
 local sampleCount = 0
 
 local guidanceSystemChoices = {
-    STAIR_LEFT, STAIR_LEFT, STAIR_RIGHT, STAIR_RIGHT, STAIR_RIGHT, STAIR_LEFT
+    STAIR_RIGHT, STAIR_LEFT, STAIR_LEFT, STAIR_RIGHT, STAIR_RIGHT, STAIR_LEFT
 }
 
 --[[
@@ -197,10 +198,25 @@ function love.update(dt)
 
     local leftStairSpeed, rightStairSpeed = 1, 1
     if leftStairCount > 20 then
-        leftStairSpeed = math.max(0.1, 1 - math.pow(leftStairCount-20, 2)/400)
+        leftStairSpeed = math.max(MIN_SPEED, 1 - math.pow(leftStairCount-20, 2)/400)
     end
     if rightStairCount > 20 then
-        rightStairSpeed = math.max(0.1, 1 - math.pow(rightStairCount-20, 2)/400)
+        rightStairSpeed = math.max(MIN_SPEED, 1 - math.pow(rightStairCount-20, 2)/400)
+    end
+
+    local speedDifference = (leftStairSpeed - rightStairSpeed)
+    if speedDifference >= 1-MIN_SPEED then
+        guidanceSystemChoices = {STAIR_LEFT, STAIR_LEFT, STAIR_LEFT, STAIR_LEFT, STAIR_LEFT, STAIR_LEFT}
+    elseif speedDifference >= 1-MIN_SPEED*2 then
+        guidanceSystemChoices = {STAIR_RIGHT, STAIR_LEFT, STAIR_LEFT, STAIR_RIGHT, STAIR_LEFT, STAIR_LEFT}
+    elseif speedDifference >= MIN_SPEED then
+        guidanceSystemChoices = {STAIR_RIGHT, STAIR_LEFT, STAIR_LEFT, STAIR_RIGHT, STAIR_RIGHT, STAIR_LEFT}
+    elseif speedDifference <= -MIN_SPEED then
+        guidanceSystemChoices = {STAIR_RIGHT, STAIR_RIGHT, STAIR_LEFT, STAIR_RIGHT, STAIR_RIGHT, STAIR_LEFT}
+    elseif speedDifference <= -(1-MIN_SPEED*2) then
+        guidanceSystemChoices = {STAIR_RIGHT, STAIR_RIGHT, STAIR_RIGHT, STAIR_RIGHT, STAIR_RIGHT, STAIR_LEFT}
+    elseif speedDifference <= -(1-MIN_SPEED) then
+        guidanceSystemChoices = {STAIR_RIGHT, STAIR_RIGHT, STAIR_RIGHT, STAIR_RIGHT, STAIR_RIGHT, STAIR_RIGHT}
     end
 
     for i, person in ipairs(people) do
@@ -368,6 +384,12 @@ function love.draw()
         love.graphics.setColor(180, 180, 180)
         love.graphics.setFont(TITLE_FONT)
         love.graphics.print('2016', TITLE_FONT:getWidth('Evacuation Simulator ') + 30, 20)
+
+        love.graphics.setFont(LABEL_FONT)
+        love.graphics.setColor(0, 0, 0)
+        for i, choice in ipairs(guidanceSystemChoices) do
+            love.graphics.print(choice == 1 and 'left' or 'right', 600 + i*50, 20)
+        end
 
         love.graphics.setColor(10, 10, 10)
         love.graphics.rectangle('fill', 0, 720-160, 1280, 160)
